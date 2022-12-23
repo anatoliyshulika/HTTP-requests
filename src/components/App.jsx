@@ -1,60 +1,64 @@
 import { Component } from 'react';
-import Section from './Section/Section';
-import FeedbackOptions from './FeedbackOptions/FeedbackOptions';
-import Statistics from './Statistics/Statistics';
-import Notification from './Notification/Notification';
+import axios from 'axios';
+import ContentLoader from 'react-content-loader';
+import fetchArticlesWithQuery from 'services/api';
+
+axios.defaults.baseURL = 'https://hn.algolia.com/api/v1';
+const MyLoader = () => (
+  <ContentLoader
+    height={140}
+    speed={1}
+    backgroundColor={'#333'}
+    foregroundColor={'#999'}
+    viewBox="0 0 380 70"
+  >
+    {/* Only SVG shapes */}
+    <rect x="0" y="0" rx="5" ry="5" width="70" height="70" />
+    <rect x="80" y="17" rx="4" ry="4" width="300" height="13" />
+    <rect x="80" y="40" rx="3" ry="3" width="250" height="10" />
+  </ContentLoader>
+);
+
+const ArticleList = ({ articles }) => (
+  <ul>
+    {articles.map(({ objectID, url, title }) => (
+      <li key={objectID}>
+        <a href={url} target="_blank" rel="noreferrer noopener">
+          {title}
+        </a>
+      </li>
+    ))}
+  </ul>
+);
 
 class App extends Component {
   state = {
-    good: 0,
-    neutral: 0,
-    bad: 0,
+    articles: [],
+    isLoading: false,
+    error: null,
   };
 
-  handleLeaveFeedback = evt => {
-    const { name } = evt.target;
-    this.setState(prevState => ({ [name]: prevState[name] + 1 }));
-  };
+  async componentDidMount() {
+    this.setState({ isLoading: true });
 
-  countTotalFeedback = () => {
-    const feedbackValues = Object.values(this.state);
-    let total = 0;
-    feedbackValues.forEach(value => {
-      total += value;
-    });
-    return total;
-  };
-
-  countPositiveFeedbackPercentage = () => {
-    const total = this.countTotalFeedback();
-    const positive = this.state.good;
-    const persentage = Math.round((positive / total) * 100);
-    return persentage ? persentage : 0;
-  };
+    try {
+      const articles = await fetchArticlesWithQuery('react');
+      this.setState({ articles });
+    } catch (error) {
+      this.setState({ error });
+    } finally {
+      this.setState({ isLoading: false });
+    }
+  }
 
   render() {
-    const { good, neutral, bad } = this.state;
+    const { articles, isLoading, error } = this.state;
+
     return (
       <div>
-        <Section title="Please leave feedback">
-          <FeedbackOptions
-            objState={this.state}
-            onLeaveFeedback={this.handleLeaveFeedback}
-          />
-        </Section>
-        <Section title="Statistics">
-          {this.countTotalFeedback() ? (
-            <Statistics
-              good={good}
-              neutral={neutral}
-              bad={bad}
-              total={this.countTotalFeedback()}
-              positivePercentage={this.countPositiveFeedbackPercentage()}
-            ></Statistics>
-          ) : (
-            <Notification message="There is no feedback" />
-          )}
-        </Section>
+        {error && <p>Whoops, something went wrong: {error.message}</p>}
+        {isLoading && <MyLoader />}
+        {articles.length > 0 && <ArticleList articles={articles} />}
       </div>
     );
   }
